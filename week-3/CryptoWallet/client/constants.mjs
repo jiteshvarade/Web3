@@ -1,0 +1,4 @@
+
+const GOOGLE_AUTH_CLIENT_KEY = import.meta.env.VITE_GOOGLE_AUTH_CLIENT_KEY
+
+export default {GOOGLE_AUTH_CLIENT_KEY}
