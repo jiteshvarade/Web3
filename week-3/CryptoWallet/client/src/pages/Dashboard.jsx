@@ -3,9 +3,10 @@ import { useLocation } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Buffer } from "buffer";
-window.Buffer = Buffer;
 import { SERVER_URL, ETH_URL } from "../../constants.mjs";
 import background from "../assets/LandingPage/HeroSection.mp4";
+
+window.Buffer = Buffer;
 
 function Dashboard() {
   const location = useLocation();
@@ -20,6 +21,7 @@ function Dashboard() {
   const [privateKey, setPrivateKey] = useState("");
   const [publicKey, setPublicKey] = useState("");
   const [accounts, setAccounts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
 
   const getAccounts = async () => {
     const res = await fetch(`${SERVER_URL}/dashboard/getAccounts/${email}`, {
@@ -94,6 +96,31 @@ function Dashboard() {
   };
 
   useEffect(() => {
+    const ws = new WebSocket(SERVER_URL);
+
+    ws.onopen = () => {
+      console.log("WebSocket connection established.");
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const transaction = JSON.parse(event.data);
+        setTransactions((prevTransactions) => [transaction, ...prevTransactions]);
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket connection closed.");
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, []);
+
+  useEffect(() => {
     if (showModal) {
       setPassword("");
       setConfirmPassword("");
@@ -133,40 +160,74 @@ function Dashboard() {
         </button>
       </div>
 
-      <div className="w-full max-w-2xl text-white relative z-10">
-        <h2 className="text-2xl mb-4">Your Accounts</h2>
-        <div className="space-y-4">
-          {accounts.length > 0 ? (
-            accounts.map((account, index) => (
-              <div
-                key={account._id}
-                className="p-4 bg-gray-800 rounded-lg shadow-md"
-              >
-                <p>
-                  <strong>Account {index + 1}:</strong>
-                </p>
-                <p className="break-words">
-                  <strong>Private Key:</strong> {account.privateKey}
-                </p>
-                <p className="break-words mt-2">
-                  <strong>Public Key:</strong> {account.publicKey}
-                </p>
-                <button
-                  className="mt-4 px-4 py-2 bg-yellow-800 text-white rounded hover:bg-yellow-700 transition"
-                  onClick={() => handleGetBalance(account.publicKey, index)}
+      <div className="w-full max-w-6xl flex space-x-6 relative z-10">
+        <div className="w-1/2 max-h-96 overflow-y-auto">
+          <h2 className="text-2xl mb-4 text-white">Your Accounts</h2>
+          <div className="space-y-4 text-white">
+            {accounts.length > 0 ? (
+              accounts.map((account, index) => (
+                <div
+                  key={account._id}
+                  className="p-4 bg-gray-800 rounded-lg shadow-md"
                 >
-                  Get Balance
-                </button>
-                {account.balance !== undefined && (
-                  <p className="mt-2">
-                    <strong>Balance:</strong> {account.balance} ETH
+                  <p>
+                    <strong>Account {index + 1}:</strong>
                   </p>
-                )}
-              </div>
-            ))
-          ) : (
-            <p>No accounts found.</p>
-          )}
+                  <p className="break-words">
+                    <strong>Private Key:</strong> {account.privateKey}
+                  </p>
+                  <p className="break-words mt-2">
+                    <strong>Public Key:</strong> {account.publicKey}
+                  </p>
+                  <button
+                    className="mt-4 px-4 py-2 bg-yellow-800 text-white rounded hover:bg-yellow-700 transition"
+                    onClick={() => handleGetBalance(account.publicKey, index)}
+                  >
+                    Get Balance
+                  </button>
+                  {account.balance !== undefined && (
+                    <p className="mt-2">
+                      <strong>Balance:</strong> {account.balance} ETH
+                    </p>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p>No accounts found.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="w-1/2 max-h-96 overflow-y-auto">
+          <h2 className="text-2xl mb-4 text-white">Live Transactions On BlockChain</h2>
+          <div className="space-y-4 text-white">
+            {transactions.length > 0 ? (
+              transactions.map((tx, index) => (
+                <div
+                  key={index}
+                  className="p-4 bg-gray-800 rounded-lg shadow-md"
+                >
+                  <p>
+                    <strong>BlockNumber {tx.blockNumber}:</strong>
+                  </p>
+                  <p className="break-words">
+                    <strong>Hash:</strong> {tx.hash}
+                  </p>
+                  <p className="break-words mt-2">
+                    <strong>From:</strong> {tx.from}
+                  </p>
+                  <p className="break-words mt-2">
+                    <strong>To:</strong> {tx.to}
+                  </p>
+                  <p className="mt-2">
+                    <strong>Value:</strong> {parseInt(tx.value, 16) / 1e18} ETH
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p>No live transactions.</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -197,26 +258,24 @@ function Dashboard() {
                   Create Wallet
                 </button>
                 <button
-                  className="w-full mt-4 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition"
+                  className="w-full px-4 py-2 mt-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
                   onClick={() => setShowModal(false)}
                 >
                   Cancel
                 </button>
               </>
             ) : (
-              <div className="text-white mt-4">
-                <h3 className="text-lg mb-2">Your Wallet Details:</h3>
-                <p className="break-words">
-                  <strong>Recovery Phrase:</strong> {recoveryPhrase}
-                </p>
-                <p className="break-words mt-2">
+              <div>
+                <h3 className="text-white text-lg mb-2">Recovery Phrase</h3>
+                <p className="text-white mb-4">{recoveryPhrase}</p>
+                <p className="text-white mb-4">
                   <strong>Private Key:</strong> {privateKey}
                 </p>
-                <p className="break-words mt-2">
+                <p className="text-white mb-4">
                   <strong>Public Key:</strong> {publicKey}
                 </p>
                 <button
-                  className="w-full mt-4 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition"
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
                   onClick={() => setShowModal(false)}
                 >
                   Close
@@ -226,6 +285,7 @@ function Dashboard() {
           </div>
         </div>
       )}
+
       <ToastContainer />
     </div>
   );
